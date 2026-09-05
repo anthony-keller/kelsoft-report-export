@@ -1,0 +1,16 @@
+# Build output
+bin/
+obj/
+publish/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+
+# Client data must never be committed — Kelsoft data files hold live accounting records
+*.mdb
+*.accdb
+*.laccdb
+*.xlsx
