@@ -15,9 +15,11 @@ public sealed class YearSelection(FinancialYear year, bool isSelected) : INotify
 
     public FinancialYear Year { get; } = year;
 
-    public string Display =>
-        $"FY{Year.Label}      {Year.Start:dd/MM/yyyy} – {Year.End:dd/MM/yyyy}      " +
-        (Year.EntryCount > 0 ? $"{Year.EntryCount:N0} entries" : "no entries");
+    public string Label => $"FY{Year.Label}";
+
+    public string Period => $"{Year.Start:dd/MM/yyyy}  –  {Year.End:dd/MM/yyyy}";
+
+    public string EntryText => Year.EntryCount > 0 ? $"{Year.EntryCount:N0} entries" : "no entries";
 
     public bool IsSelected
     {
@@ -75,6 +77,7 @@ public partial class MainWindow : Window
     {
         _years.Clear();
         ClientLabel.Text = "";
+        ClientChipPanel.Visibility = Visibility.Collapsed;
 
         List<FinancialYear> years;
         try
@@ -99,19 +102,21 @@ public partial class MainWindow : Window
         }
 
         DataFileBox.Text = path;
-        ClientLabel.Text = $"Client:  {_clientName}";
+        ClientLabel.Text = _clientName;
+        ClientChipPanel.Visibility = Visibility.Visible;
 
         foreach (var year in years)
             _years.Add(new YearSelection(year, year.EntryCount > 0));
 
+        EmptyYears.Visibility = _years.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         if (_years.Count == 0)
-            ClientLabel.Text += "      (no financial years defined in this file)";
+            EmptyYears.Text = "This file defines no financial years.";
 
         OutputBox.Text = System.IO.Path.Combine(
             System.IO.Path.GetDirectoryName(path) ?? "",
             SuggestFileName(path));
 
-        SetStatus($"{_years.Count} financial year(s) found.");
+        SetStatus("Ready to export.");
         UpdateExportState();
     }
 
@@ -154,10 +159,16 @@ public partial class MainWindow : Window
     {
         if (ExportButton is null) return;
 
+        var selected = _years.Count(y => y.IsSelected);
+
         ExportButton.IsEnabled =
             DataFileBox.Text.Length > 0 &&
-            _years.Any(y => y.IsSelected) &&
+            selected > 0 &&
             (WantProfitAndLoss || WantBalanceSheet);
+
+        YearSummary.Text = _years.Count == 0
+            ? ""
+            : $"{selected} of {_years.Count} selected";
     }
 
     private string SuggestFileName(string dataFilePath)
@@ -194,10 +205,12 @@ public partial class MainWindow : Window
 
         SetBusy(true);
 
+        var unbalanced = new List<string>();
+        var succeeded = false;
+
         try
         {
             var clientName = _clientName;
-            var unbalanced = new List<string>();
 
             await Task.Run(() =>
             {
@@ -229,19 +242,7 @@ public partial class MainWindow : Window
 
             var sheets = years.Count * ((wantProfitAndLoss ? 1 : 0) + (wantBalanceSheet ? 1 : 0));
             SetStatus($"Wrote {sheets} worksheet(s).");
-
-            if (unbalanced.Count > 0)
-                ShowWarning("The balance sheet does not balance in every month for:\n\n" +
-                            string.Join("\n", unbalanced) +
-                            "\n\nThe workbook was still written. This points at the underlying data — " +
-                            "usually an unbalanced journal, or bank entries whose allocation dates " +
-                            "straddle a month end — rather than at the export.");
-
-            if (OpenWhenDone.IsChecked == true)
-                Process.Start(new ProcessStartInfo(outputPath) { UseShellExecute = true });
-            else
-                MessageBox.Show(this, $"Saved to:\n{outputPath}", "Export complete",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+            succeeded = true;
         }
         catch (Exception ex)
         {
@@ -252,6 +253,23 @@ public partial class MainWindow : Window
         {
             SetBusy(false);
         }
+
+        if (!succeeded) return;
+
+        // Prompt only once the window is out of its working state, so the progress bar
+        // isn't still running behind a modal dialog.
+        if (unbalanced.Count > 0)
+            ShowWarning("The balance sheet does not balance in every month for:\n\n" +
+                        string.Join("\n", unbalanced) +
+                        "\n\nThe workbook was still written. This points at the underlying data — " +
+                        "usually an unbalanced journal, or bank entries whose allocation dates " +
+                        "straddle a month end — rather than at the export.");
+
+        if (OpenWhenDone.IsChecked == true)
+            Process.Start(new ProcessStartInfo(outputPath) { UseShellExecute = true });
+        else
+            MessageBox.Show(this, $"Saved to:\n{outputPath}", "Export complete",
+                MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void Report(string message) => Dispatcher.Invoke(() => SetStatus(message));
