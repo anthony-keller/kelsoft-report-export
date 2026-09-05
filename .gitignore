@@ -4,6 +4,8 @@ obj/
 publish/
 publish-single/
 publish-single-x86/
+artifacts/
+notes.md
 
 # Visual Studio / Rider
 .vs/

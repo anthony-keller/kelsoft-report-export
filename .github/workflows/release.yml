@@ -1,0 +1,103 @@
+# Builds both single-file executables and attaches them to a GitHub release.
+#
+# Triggered by pushing a version tag:
+#
+#   git tag v1.0.0 && git push origin v1.0.0
+#
+# The tag name (minus the leading v) becomes the assembly version, so the version
+# a user has is the tag they downloaded. Can also be run by hand from the Actions
+# tab, which produces a draft release for testing the pipeline.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (no leading v), e.g. 1.0.0'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # Must be Windows: WPF cannot be built on Linux, and each publish targets a
+    # Windows runtime identifier.
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Work out the version
+        id: version
+        shell: pwsh
+        run: |
+          $version = if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            '${{ inputs.version }}'
+          } else {
+            '${{ github.ref_name }}' -replace '^v', ''
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=v$version"    >> $env:GITHUB_OUTPUT
+
+      - name: Publish 64-bit
+        run: dotnet publish -p:PublishProfile=SingleFile -p:Version=${{ steps.version.outputs.version }}
+
+      - name: Publish 32-bit
+        run: dotnet publish -p:PublishProfile=SingleFileX86 -p:Version=${{ steps.version.outputs.version }}
+
+      # Both profiles emit KelsoftReportExport.exe, so the assets are renamed to
+      # carry the bitness — a release cannot hold two files of the same name, and
+      # the bitness is the one thing a downloader has to choose correctly.
+      - name: Collect the assets
+        shell: pwsh
+        run: |
+          $v = '${{ steps.version.outputs.version }}'
+          New-Item -ItemType Directory artifacts | Out-Null
+          Copy-Item publish-single/KelsoftReportExport.exe     "artifacts/KelsoftReportExport-$v-win-x64.exe"
+          Copy-Item publish-single-x86/KelsoftReportExport.exe "artifacts/KelsoftReportExport-$v-win-x86.exe"
+          Get-ChildItem artifacts/*.exe |
+            ForEach-Object { '{0}  {1}' -f (Get-FileHash $_ -Algorithm SHA256).Hash.ToLower(), $_.Name } |
+            Set-Content artifacts/SHA256SUMS.txt -Encoding ascii
+          Get-Content artifacts/SHA256SUMS.txt
+
+      - name: Write the release notes
+        shell: pwsh
+        run: |
+          $v = '${{ steps.version.outputs.version }}'
+          $notes = @(
+            'Two builds of the same app. Pick the one matching the bitness of the Access'
+            'Database Engine installed on the machine — that is, the bitness of Office.'
+            ''
+            '| Machine | Download |'
+            '|---|---|'
+            "| 64-bit Office / Access | ``KelsoftReportExport-$v-win-x64.exe`` |"
+            "| 32-bit Office / Access | ``KelsoftReportExport-$v-win-x86.exe`` |"
+            ''
+            'If in doubt, try 64-bit first — it names the missing provider rather than'
+            'failing silently. Nothing to install: the .NET runtime is inside the executable.'
+            ''
+            'Windows SmartScreen warns on first run because the executable is not code'
+            'signed — **More info**, then **Run anyway**. `SHA256SUMS.txt` lists the hashes'
+            'if you want to check what you downloaded.'
+          )
+          Set-Content notes.md ($notes -join "`n") -Encoding utf8
+
+      - name: Publish the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = '${{ steps.version.outputs.tag }}'
+          $ghArgs = @($tag) + (Get-ChildItem artifacts).FullName +
+                    @('--title', $tag, '--notes-file', 'notes.md')
+          # A dispatch run is for testing the pipeline, so it stays a draft.
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch') { $ghArgs += '--draft' }
+          gh release create @ghArgs

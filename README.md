@@ -13,6 +13,27 @@ statements with a column per month.
 | Balance Sheet | `FY2025 BS` | 12 month-end positions |
 | General Ledger Summary | `FY2025 GL` | Opening + 12 months + Closing |
 
+## Downloading it
+
+Grab the latest [release](https://github.com/anthony-keller/kelsoft-report-export/releases/latest)
+and pick the build matching the bitness of Access on that machine — `win-x64` for 64-bit
+Office, `win-x86` for 32-bit. There is nothing to install; the .NET runtime is inside the
+executable. See [the one prerequisite that cannot be bundled](#the-one-prerequisite-that-cannot-be-bundled)
+if you are unsure which to take.
+
+Windows SmartScreen warns on first run because the executable is not code signed —
+**More info**, then **Run anyway**.
+
+Releases are built by [`.github/workflows/release.yml`](.github/workflows/release.yml) from a
+version tag:
+
+```
+git tag v1.0.0 && git push origin v1.0.0
+```
+
+which publishes both executables and a `SHA256SUMS.txt`. The tag also becomes the assembly
+version, so a downloaded exe reports the tag it came from.
+
 ## Running it
 
 ```
