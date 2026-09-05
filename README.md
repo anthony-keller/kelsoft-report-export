@@ -15,24 +15,12 @@ statements with a column per month.
 
 ## Downloading it
 
-Grab the latest [release](https://github.com/anthony-keller/kelsoft-report-export/releases/latest)
-and pick the build matching the bitness of Access on that machine — `win-x64` for 64-bit
-Office, `win-x86` for 32-bit. There is nothing to install; the .NET runtime is inside the
-executable. See [the one prerequisite that cannot be bundled](#the-one-prerequisite-that-cannot-be-bundled)
-if you are unsure which to take.
-
-Windows SmartScreen warns on first run because the executable is not code signed —
+The [latest release](https://github.com/anthony-keller/kelsoft-report-export/releases/latest)
+carries both builds: take `win-x64`, or `win-x86` if Office on that machine is 32-bit (see
+below). Nothing to install. SmartScreen warns on first run because it is unsigned —
 **More info**, then **Run anyway**.
 
-Releases are built by [`.github/workflows/release.yml`](.github/workflows/release.yml) from a
-version tag:
-
-```
-git tag v1.0.0 && git push origin v1.0.0
-```
-
-which publishes both executables and a `SHA256SUMS.txt`. The tag also becomes the assembly
-version, so a downloaded exe reports the tag it came from.
+Cut a release by pushing a tag: `git tag v1.0.0 && git push origin v1.0.0`.
 
 ## Running it
 
@@ -69,8 +57,8 @@ bitness must match the app** — which is why both builds exist:
 
 | Machine | Build to use |
 |---|---|
-| 64-bit Office / Access | `publish-single\KelsoftReportExport.exe` |
-| 32-bit Office / Access | `publish-single-x86\KelsoftReportExport.exe` |
+| 64-bit Office / Access | the `win-x64` build |
+| 32-bit Office / Access | the `win-x86` build |
 | No Office at all | Either, plus the matching Access Database Engine redistributable |
 
 In practice any machine that runs Kelsoft already has Access, so ACE is present — the only
@@ -220,10 +208,12 @@ UI is both narratable and drivable from UI Automation — which is how it is tes
 | `MaximiseBehaviour.cs` | Frameless maximise confined to the monitor work area |
 | `Theme.xaml` | Palette, control templates, animations |
 | `App.xaml`, `MainWindow.xaml(.cs)` | The window |
+| `.github/workflows/release.yml` | Tag → both executables, attached to a release |
 
 ## Verifying a change
 
-The reference data file should produce, for FY2025:
+The reference file used in development is a real client data file and is deliberately not
+in this repository — `.mdb`, `.accdb` and `.xlsx` are gitignored. It produces, for FY2025:
 
 | Sales | Cost of Sales | Other Income | Other Expenses | Gross Profit | Net Profit |
 |---|---|---|---|---|---|
