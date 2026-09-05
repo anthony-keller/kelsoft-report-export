@@ -16,7 +16,7 @@ statements with a column per month.
 ## Running it
 
 ```
-publish\KelsoftReportExport.exe ["path\to\data.mdb"]
+KelsoftReportExport.exe ["path\to\data.mdb"]
 ```
 
 1. **Browse…** to a client data file (`.mdb` or `.accdb`), or pass one as an argument.
@@ -25,12 +25,38 @@ publish\KelsoftReportExport.exe ["path\to\data.mdb"]
 3. Choose where to save the `.xlsx`.
 4. **Export.**
 
-### Requirements
+## Publishing a single executable
 
-- Windows, .NET 10 desktop runtime.
-- The **64-bit** Microsoft Access Database Engine (ACE OLEDB). It ships with 64-bit Office;
-  otherwise install the Access Database Engine redistributable. The app is built x64 for
-  this reason — a 32-bit build cannot load the 64-bit provider.
+```
+dotnet publish -p:PublishProfile=SingleFile      # 64-bit, into publish-single
+dotnet publish -p:PublishProfile=SingleFileX86   # 32-bit, into publish-single-x86
+```
+
+Each produces one self-contained `KelsoftReportExport.exe` — about 65 MB for x64, 60 MB for
+x86. Copy it anywhere and run it; the .NET runtime is bundled, so the machine needs no .NET
+install. The settings live in `Properties\PublishProfiles\`.
+
+On first run it extracts WPF's native libraries to `%TEMP%\.net\KelsoftReportExport`, which
+costs about a second. Measured on the development machine: 2.3s cold, 1.3s once warm,
+against 1.2s for an ordinary framework-dependent build.
+
+### The one prerequisite that cannot be bundled
+
+The app reads Access files through the **Microsoft Access Database Engine (ACE OLEDB)**,
+a system-registered COM provider. It cannot be carried inside the executable, and **its
+bitness must match the app** — which is why both builds exist:
+
+| Machine | Build to use |
+|---|---|
+| 64-bit Office / Access | `publish-single\KelsoftReportExport.exe` |
+| 32-bit Office / Access | `publish-single-x86\KelsoftReportExport.exe` |
+| No Office at all | Either, plus the matching Access Database Engine redistributable |
+
+In practice any machine that runs Kelsoft already has Access, so ACE is present — the only
+question is which bitness. If in doubt, try the 64-bit build first.
+
+Nothing silently misbehaves when the provider is absent: `KelsoftDataFile` tries ACE 16, then
+ACE 12, then reports which bitness is missing and which build is running.
 
 WPF was chosen over WinForms deliberately: it lays out in device-independent units, so the
 window is correct on high-DPI displays without any per-control scaling work.

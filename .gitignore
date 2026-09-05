@@ -2,6 +2,8 @@
 bin/
 obj/
 publish/
+publish-single/
+publish-single-x86/
 
 # Visual Studio / Rider
 .vs/

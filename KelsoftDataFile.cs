@@ -39,9 +39,16 @@ public sealed class KelsoftDataFile : IDisposable
             }
         }
 
+        // The provider is a system-registered COM component and cannot be shipped with the
+        // app, so report the bitness this build actually needs — an x86 build cannot load
+        // the 64-bit provider, or vice versa.
+        var bitness = Environment.Is64BitProcess ? "64-bit" : "32-bit";
+
         throw new InvalidOperationException(
-            "Could not open the data file. The 64-bit Microsoft Access Database Engine " +
-            "(ACE OLEDB) must be installed on this machine.", last);
+            $"Could not open the data file. The {bitness} Microsoft Access Database Engine " +
+            $"(ACE OLEDB) must be installed on this machine. This is the {bitness} build, so " +
+            "it needs the provider that comes with " +
+            $"{bitness} Office — or the matching Access Database Engine redistributable.", last);
     }
 
     /// <summary>Confirms the file carries the tables a Kelsoft data file is expected to have.</summary>

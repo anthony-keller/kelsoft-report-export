@@ -6,8 +6,9 @@
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <!-- The ACE OLEDB provider installed with 64-bit Office is x64 only. -->
-    <PlatformTarget>x64</PlatformTarget>
+    <!-- Bitness is decided by the publish profile's RuntimeIdentifier, because the app
+         must match the bitness of the installed ACE OLEDB provider: win-x64 for 64-bit
+         Office, win-x86 for 32-bit. Left unset here so both can be produced. -->
     <AssemblyName>KelsoftReportExport</AssemblyName>
     <RootNamespace>KelsoftReportExport</RootNamespace>
     <ApplicationIcon>app.ico</ApplicationIcon>
