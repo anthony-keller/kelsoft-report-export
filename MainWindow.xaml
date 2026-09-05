@@ -7,35 +7,84 @@
         FontFamily="Segoe UI" FontSize="13"
         Background="{StaticResource Page}"
         TextOptions.TextFormattingMode="Ideal"
-        UseLayoutRounding="True">
+        UseLayoutRounding="True"
+        WindowStyle="None" ResizeMode="CanResize"
+        Icon="app.ico">
 
-    <Grid>
+    <WindowChrome.WindowChrome>
+        <!-- Caption height 0: the header handles dragging itself, so the whole navy
+             band is grabbable rather than just a strip across the top. -->
+        <WindowChrome CaptionHeight="0" ResizeBorderThickness="6"
+                      GlassFrameThickness="0" CornerRadius="0" />
+    </WindowChrome.WindowChrome>
+
+    <Window.Triggers>
+        <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+            <BeginStoryboard>
+                <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="RootPanel"
+                                     Storyboard.TargetProperty="Opacity"
+                                     From="0" To="1" Duration="0:0:0.24" />
+                    <DoubleAnimation Storyboard.TargetName="RootPanel"
+                                     Storyboard.TargetProperty="RenderTransform.Y"
+                                     From="14" To="0" Duration="0:0:0.34">
+                        <DoubleAnimation.EasingFunction>
+                            <CubicEase EasingMode="EaseOut" />
+                        </DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                </Storyboard>
+            </BeginStoryboard>
+        </EventTrigger>
+    </Window.Triggers>
+
+    <Grid x:Name="RootPanel"><Grid.RenderTransform><TranslateTransform /></Grid.RenderTransform>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- ============ header ============ -->
-        <Border Grid.Row="0" Background="{StaticResource HeaderBrush}" Padding="30,24,30,26">
+        <!-- ============ header (doubles as the title bar) ============ -->
+        <Border Grid.Row="0" Background="{StaticResource HeaderBrush}"
+                MouseLeftButtonDown="Header_MouseLeftButtonDown">
             <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-                <Border Grid.Column="0" Width="46" Height="46" CornerRadius="11"
-                        Background="#26456C" Margin="0,2,18,0">
-                    <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE9D2;"
-                               FontSize="22" Foreground="#8FB6E8"
-                               HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
-
-                <StackPanel Grid.Column="1">
-                    <TextBlock Text="Kelsoft Report Export" Style="{StaticResource AppTitle}" />
-                    <TextBlock Style="{StaticResource AppSubtitle}"
-                               Text="Monthly Profit and Loss and Balance Sheet statements, straight from a Kelsoft client data file to Excel." />
+                <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right"
+                            WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Button Style="{StaticResource CaptionButton}" Content="&#xE921;"
+                            ToolTip="Minimise" AutomationProperties.Name="Minimise"
+                            Click="Minimise_Click" />
+                    <Button x:Name="MaximiseButton" Style="{StaticResource CaptionButton}"
+                            Content="&#xE922;" ToolTip="Maximise"
+                            AutomationProperties.Name="Maximise" Click="Maximise_Click" />
+                    <Button Style="{StaticResource CloseCaptionButton}" Content="&#xE8BB;"
+                            ToolTip="Close" AutomationProperties.Name="Close"
+                            Click="Close_Click" />
                 </StackPanel>
+
+                <Grid Grid.Row="1" Margin="30,6,30,26">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Width="46" Height="46" CornerRadius="11"
+                            Background="#26456C" Margin="0,2,18,0">
+                        <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE9D2;"
+                                   FontSize="22" Foreground="#8FB6E8"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Kelsoft Report Export" Style="{StaticResource AppTitle}" />
+                        <TextBlock Style="{StaticResource AppSubtitle}"
+                                   Text="Monthly Profit and Loss, Balance Sheet and General Ledger statements, straight from a Kelsoft client data file to Excel." />
+                    </StackPanel>
+                </Grid>
             </Grid>
         </Border>
 
@@ -113,25 +162,39 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
                     <ToggleButton x:Name="ProfitAndLossCheck" Grid.Column="0" IsChecked="True"
-                                  Style="{StaticResource ReportCard}" Margin="0,0,7,0"
+                                  AutomationProperties.Name="Profit and Loss"
+                                  Style="{StaticResource ReportCard}" Margin="0,0,6,0"
                                   Checked="ReportChoice_Changed" Unchecked="ReportChoice_Changed">
                         <StackPanel>
-                            <TextBlock Text="Profit and Loss Statement" Style="{StaticResource ReportCardTitle}" />
+                            <TextBlock Text="Profit and Loss" Style="{StaticResource ReportCardTitle}" />
                             <TextBlock Style="{StaticResource ReportCardDetail}"
-                                       Text="Trading income through to net profit — twelve monthly columns plus a year total." />
+                                       Text="Trading income through to net profit, with a year total." />
                         </StackPanel>
                     </ToggleButton>
 
                     <ToggleButton x:Name="BalanceSheetCheck" Grid.Column="1" IsChecked="True"
-                                  Style="{StaticResource ReportCard}" Margin="7,0,0,0"
+                                  AutomationProperties.Name="Balance Sheet"
+                                  Style="{StaticResource ReportCard}" Margin="6,0,6,0"
                                   Checked="ReportChoice_Changed" Unchecked="ReportChoice_Changed">
                         <StackPanel>
                             <TextBlock Text="Balance Sheet" Style="{StaticResource ReportCardTitle}" />
                             <TextBlock Style="{StaticResource ReportCardDetail}"
-                                       Text="Owners equity against assets and liabilities, as at each month end." />
+                                       Text="Equity, assets and liabilities at each month end." />
+                        </StackPanel>
+                    </ToggleButton>
+
+                    <ToggleButton x:Name="GeneralLedgerCheck" Grid.Column="2" IsChecked="True"
+                                  AutomationProperties.Name="General Ledger"
+                                  Style="{StaticResource ReportCard}" Margin="6,0,0,0"
+                                  Checked="ReportChoice_Changed" Unchecked="ReportChoice_Changed">
+                        <StackPanel>
+                            <TextBlock Text="General Ledger" Style="{StaticResource ReportCardTitle}" />
+                            <TextBlock Style="{StaticResource ReportCardDetail}"
+                                       Text="Every account: opening balance, monthly movement, close." />
                         </StackPanel>
                     </ToggleButton>
                 </Grid>

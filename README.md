@@ -1,4 +1,4 @@
-# Kelsoft — Monthly Report Export
+# Kelsoft Report Export
 
 A Windows app (.NET 10, WPF) that reads a Kelsoft **client data file** — the back-end `.mdb`
 the Kelsoft front-end links to — and writes an Excel workbook with **a worksheet per report
@@ -10,12 +10,13 @@ statements with a column per month.
 | Report | Sheet | Columns |
 |---|---|---|
 | Profit and Loss Statement | `FY2025 P&L` | 12 months + Total |
-| Balance Sheet | `FY2025 BS` | 12 month-end positions (no total — see below) |
+| Balance Sheet | `FY2025 BS` | 12 month-end positions |
+| General Ledger Summary | `FY2025 GL` | Opening + 12 months + Closing |
 
 ## Running it
 
 ```
-KelsoftReportExport\publish\KelsoftReportExport.exe ["path\to\data.mdb"]
+publish\KelsoftReportExport.exe ["path\to\data.mdb"]
 ```
 
 1. **Browse…** to a client data file (`.mdb` or `.accdb`), or pass one as an argument.
@@ -92,10 +93,22 @@ year end.
 
 Presentation: assets on a debit basis, liabilities and capital on a credit basis. Layout
 follows the report — OWNERS EQUITY (Capital + Other Capital + Profit/Loss), then
-"represented by" with Assets, Liabilities and NET ASSETS.
+"represented by" with Assets, Liabilities and NET ASSETS. There is no total column: balances
+are cumulative, so the last column is the year-end position.
 
-**There is no total column.** Balances are cumulative, so summing the months is meaningless;
-the last column is the year-end position.
+### General Ledger Summary
+
+The Access "Ledger Enquiry" lists every allocation individually beneath an opening balance
+row. This is the same ledger summarised to one column per month, which makes it a trial
+balance carried across the year: opening balance, twelve monthly movements, closing balance,
+grouped by account type.
+
+Movements are on the **raw ledger basis — debit positive, credit negative — for every
+account alike**, with none of the presentation sign flips the other two reports apply. That
+is what makes it reconcile in both directions:
+
+- closing balances on asset accounts equal the Balance Sheet's total assets;
+- movements on trading accounts equal the Profit and Loss net profit, negated.
 
 ### Differences from the Access reports
 
@@ -114,12 +127,13 @@ June therefore carries most year-end adjustments and looks heavy. General journa
 identifiable as `ALLOCATIONS.transaction_id IS NULL`, so splitting them into their own
 column later is a contained change to `StatementBuilder`.
 
-## When the balance sheet does not balance
+## When the books do not balance
 
-Every entry balances, so Net Assets must equal Total Owners Equity in every month. The app
-checks this per month and warns, naming the worst month, but still writes the workbook —
-a failure points at the data, not the export. The usual causes are an unbalanced general
-journal, or bank entries whose allocation dates straddle a month end.
+Every entry balances, so two things must hold in every month: the Balance Sheet's Net Assets
+equals Total Owners Equity, and the General Ledger's all-accounts row is zero. The app checks
+per month and warns, naming the worst month, but still writes the workbook — a failure points
+at the data, not the export. The usual causes are an unbalanced general journal, or bank
+entries whose allocation dates straddle a month end.
 
 In the sample file, 83 of 84 months balance at exactly 0.00. August 2024 is out by
 86,970.75 and corrects itself in September:
@@ -130,16 +144,34 @@ In the sample file, 83 of 84 months balance at exactly 0.00. August 2024 is out 
 | One payment, legs split across the month end | −4,752.00 | +4,320.00 |
 | General journals | −46,878.41 | 0.00 |
 
+## The window
+
+The standard title bar is replaced by `WindowChrome`, with the navy header acting as the
+caption — draggable, double-click to maximise, and its own minimise/maximise/close buttons.
+
+`MaximiseBehaviour` answers `WM_GETMINMAXINFO` with the work area of whichever monitor the
+window is on. Without it a frameless window maximises to the full monitor and covers the
+taskbar.
+
+Interactions are animated: the window rises as it opens, year rows settle into place as a
+file is read, checkboxes and report cards cross-fade with a small tick pop. Every element
+that carries only an icon or a panel for content has an `AutomationProperties.Name`, so the
+UI is both narratable and drivable from UI Automation — which is how it is tested.
+
 ## Code layout
 
 | File | Role |
 |---|---|
 | `Model.cs` | Account-type map, financial year, P&L statement types and formulas |
 | `BalanceSheetModel.cs` | Balance sheet types, totals and the balance check |
+| `GeneralLedgerModel.cs` | Ledger types, group totals and the debits-equal-credits check |
 | `KelsoftDataFile.cs` | OLEDB reads; provider fallback ACE 16 → 12 |
 | `StatementBuilder.cs` | Monthly movements → Profit and Loss |
-| `BalanceSheetBuilder.cs` | Monthly movements + opening balances → Balance Sheet |
+| `BalanceSheetBuilder.cs` | Movements + opening balances → Balance Sheet |
+| `GeneralLedgerBuilder.cs` | Movements + opening balances → General Ledger |
 | `ExcelExporter.cs` | Worksheet writing (ClosedXML) |
+| `MaximiseBehaviour.cs` | Frameless maximise confined to the monitor work area |
+| `Theme.xaml` | Palette, control templates, animations |
 | `App.xaml`, `MainWindow.xaml(.cs)` | The window |
 
 ## Verifying a change
@@ -153,8 +185,10 @@ The reference data file should produce, for FY2025:
 and a balance sheet at 30/06/2025 of Total Assets 5,844,276.86, Total Liabilities
 5,764,732.86, Net Assets **79,544.00** = Total Owners Equity.
 
-Two invariants worth keeping in any test:
+Four invariants worth keeping in any test, all holding across the seven years except for the
+August 2024 data issue above:
 
-- Net Assets equals Total Owners Equity in every month (except the August 2024 data issue).
-- The balance sheet's Profit/Loss line equals the cumulative P&L Net Profit, month for month.
-  This ties the two reports to each other and holds in all seven years.
+1. Balance Sheet: Net Assets equals Total Owners Equity, every month.
+2. General Ledger: opening and closing totals across all accounts are zero.
+3. General Ledger trading movement equals the P&L net profit, negated, every month.
+4. General Ledger asset closing equals the Balance Sheet total assets, every month.

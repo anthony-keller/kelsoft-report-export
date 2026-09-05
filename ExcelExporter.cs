@@ -3,11 +3,12 @@ using ClosedXML.Excel;
 
 namespace KelsoftReportExport;
 
-/// <summary>What to write for one financial year — either report, or both.</summary>
+/// <summary>What to write for one financial year — any combination of the reports.</summary>
 public sealed record YearExport(
     FinancialYear Year,
     ProfitAndLossStatement? ProfitAndLoss,
-    BalanceSheet? BalanceSheet);
+    BalanceSheet? BalanceSheet,
+    GeneralLedger? GeneralLedger);
 
 /// <summary>
 /// Writes a worksheet per report per financial year, laid out like the Access reports
@@ -26,6 +27,9 @@ public static class ExcelExporter
 
             if (export.BalanceSheet is { } balanceSheet)
                 WriteBalanceSheet(workbook, balanceSheet);
+
+            if (export.GeneralLedger is { } generalLedger)
+                WriteGeneralLedger(workbook, generalLedger);
         }
 
         workbook.SaveAs(outputPath);
@@ -36,7 +40,7 @@ public static class ExcelExporter
     private static void WriteProfitAndLoss(XLWorkbook workbook, ProfitAndLossStatement statement)
     {
         var sheet = workbook.Worksheets.Add($"{statement.Year.SheetName} P&L");
-        var writer = new SheetWriter(sheet, statement.MonthCount, withTotalColumn: true);
+        var writer = new SheetWriter(sheet, statement.MonthCount, trailingHeader: "Total");
 
         writer.Title(
             statement.ClientName,
@@ -84,7 +88,7 @@ public static class ExcelExporter
         var sheet = workbook.Worksheets.Add($"{sheetData.Year.SheetName} BS");
 
         // Balances are cumulative, so summing the months would be meaningless — no total column.
-        var writer = new SheetWriter(sheet, sheetData.MonthCount, withTotalColumn: false);
+        var writer = new SheetWriter(sheet, sheetData.MonthCount);
 
         writer.Title(
             sheetData.ClientName,
@@ -135,20 +139,76 @@ public static class ExcelExporter
         writer.Blank();
     }
 
+    // ------------------------------------------------------------ general ledger
+
+    private static void WriteGeneralLedger(XLWorkbook workbook, GeneralLedger ledger)
+    {
+        var sheet = workbook.Worksheets.Add($"{ledger.Year.SheetName} GL");
+        var months = ledger.MonthCount;
+
+        var writer = new SheetWriter(sheet, months,
+            leadingHeader: "Opening", trailingHeader: "Closing");
+
+        writer.Title(
+            ledger.ClientName,
+            "General Ledger Summary",
+            $"Movement by month, financial year ending {ledger.Year.End:dd/MM/yyyy}");
+        writer.Headings(ledger.Months);
+
+        foreach (var group in ledger.Groups)
+        {
+            writer.SectionHeading(group.Heading);
+
+            foreach (var line in group.Lines)
+                writer.AccountRow(line.AccountId, line.AccountName, line.Monthly,
+                    leading: line.Opening, trailing: line.Closing);
+
+            writer.TotalRow($"TOTAL {group.Heading.ToUpperInvariant()}",
+                group.MonthlyTotals(months),
+                leading: group.OpeningTotal, trailing: group.ClosingTotal);
+            writer.Blank();
+        }
+
+        writer.TotalRow("TOTAL — ALL ACCOUNTS", ledger.MonthlyTotals(),
+            leading: ledger.OpeningTotal, trailing: ledger.ClosingTotal, emphasise: true);
+
+        writer.Blank();
+        writer.Note("Debit positive, credit negative, on the raw ledger basis — no presentation sign flips. " +
+                    "Because every entry balances, the all-accounts row is zero in a period that balances.");
+        writer.Finish();
+    }
+
     // ---------------------------------------------------------------- sheet layout
 
-    private sealed class SheetWriter(IXLWorksheet sheet, int months, bool withTotalColumn)
+    private sealed class SheetWriter
     {
         private const string MoneyFormat = "#,##0.00;(#,##0.00);\"-\"";
         private const int CodeColumn = 1;
         private const int NameColumn = 2;
-        private const int FirstMonthColumn = 3;
+        private const int FirstValueColumn = 3;
         private const int HeaderRow = 5;
+
+        private readonly IXLWorksheet _sheet;
+        private readonly int _months;
+        private readonly string? _leadingHeader;
+        private readonly string? _trailingHeader;
+        private readonly int _firstMonthColumn;
 
         private int _row = HeaderRow + 1;
 
-        private int TotalColumn => FirstMonthColumn + months;
-        private int LastColumn => withTotalColumn ? TotalColumn : TotalColumn - 1;
+        public SheetWriter(IXLWorksheet sheet, int months,
+            string? leadingHeader = null, string? trailingHeader = null)
+        {
+            _sheet = sheet;
+            _months = months;
+            _leadingHeader = leadingHeader;
+            _trailingHeader = trailingHeader;
+            _firstMonthColumn = FirstValueColumn + (leadingHeader is null ? 0 : 1);
+        }
+
+        private int TrailingColumn => _firstMonthColumn + _months;
+
+        private int LastColumn => _trailingHeader is null ? TrailingColumn - 1 : TrailingColumn;
 
         public void Title(string client, string reportName, string period)
         {
@@ -157,11 +217,11 @@ public static class ExcelExporter
             Set(3, period, bold: false, size: 9.5);
 
             foreach (var row in new[] { 1, 2, 3 })
-                sheet.Range(row, CodeColumn, row, LastColumn).Merge();
+                _sheet.Range(row, CodeColumn, row, LastColumn).Merge();
 
             void Set(int row, string text, bool bold, double size)
             {
-                var cell = sheet.Cell(row, CodeColumn);
+                var cell = _sheet.Cell(row, CodeColumn);
                 cell.Value = text;
                 cell.Style.Font.Bold = bold;
                 cell.Style.Font.FontSize = size;
@@ -170,52 +230,57 @@ public static class ExcelExporter
 
         public void Headings(IReadOnlyList<DateTime> monthList)
         {
-            sheet.Cell(HeaderRow, CodeColumn).Value = "Code";
-            sheet.Cell(HeaderRow, NameColumn).Value = "Account";
+            _sheet.Cell(HeaderRow, CodeColumn).Value = "Code";
+            _sheet.Cell(HeaderRow, NameColumn).Value = "Account";
+
+            if (_leadingHeader is not null)
+                _sheet.Cell(HeaderRow, FirstValueColumn).Value = _leadingHeader;
 
             // Invariant culture keeps every abbreviation to three letters — current CLDR
             // data renders September as "Sept", which breaks the column rhythm.
-            for (var i = 0; i < months; i++)
-                sheet.Cell(HeaderRow, FirstMonthColumn + i).Value =
+            for (var i = 0; i < _months; i++)
+                _sheet.Cell(HeaderRow, _firstMonthColumn + i).Value =
                     monthList[i].ToString("MMM yy", CultureInfo.InvariantCulture);
 
-            if (withTotalColumn)
-                sheet.Cell(HeaderRow, TotalColumn).Value = "Total";
+            if (_trailingHeader is not null)
+                _sheet.Cell(HeaderRow, TrailingColumn).Value = _trailingHeader;
 
-            var headings = sheet.Range(HeaderRow, CodeColumn, HeaderRow, LastColumn);
+            var headings = _sheet.Range(HeaderRow, CodeColumn, HeaderRow, LastColumn);
             headings.Style.Font.Bold = true;
             headings.Style.Border.BottomBorder = XLBorderStyleValues.Medium;
             headings.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
 
-            sheet.Cell(HeaderRow, CodeColumn).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
-            sheet.Cell(HeaderRow, NameColumn).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+            _sheet.Cell(HeaderRow, CodeColumn).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+            _sheet.Cell(HeaderRow, NameColumn).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
         }
 
         public void SectionHeading(string text)
         {
-            var cell = sheet.Cell(_row, NameColumn);
+            var cell = _sheet.Cell(_row, NameColumn);
             cell.Value = text;
             cell.Style.Font.Bold = true;
             _row++;
         }
 
-        public void AccountRow(double accountId, string name, decimal[] values)
+        public void AccountRow(double accountId, string name, decimal[] values,
+            decimal? leading = null, decimal? trailing = null)
         {
-            var code = sheet.Cell(_row, CodeColumn);
+            var code = _sheet.Cell(_row, CodeColumn);
             code.Value = accountId;
             code.Style.NumberFormat.Format = "0.00";
 
-            sheet.Cell(_row, NameColumn).Value = name;
-            WriteValues(values);
+            _sheet.Cell(_row, NameColumn).Value = name;
+            WriteValues(values, leading, trailing);
             _row++;
         }
 
-        public void TotalRow(string label, decimal[] values, bool emphasise = false)
+        public void TotalRow(string label, decimal[] values,
+            decimal? leading = null, decimal? trailing = null, bool emphasise = false)
         {
-            sheet.Cell(_row, NameColumn).Value = label;
-            WriteValues(values);
+            _sheet.Cell(_row, NameColumn).Value = label;
+            WriteValues(values, leading, trailing);
 
-            var span = sheet.Range(_row, NameColumn, _row, LastColumn);
+            var span = _sheet.Range(_row, NameColumn, _row, LastColumn);
             span.Style.Font.Bold = true;
             span.Style.Border.TopBorder = XLBorderStyleValues.Thin;
 
@@ -229,7 +294,7 @@ public static class ExcelExporter
 
         public void Note(string text)
         {
-            var cell = sheet.Cell(_row, NameColumn);
+            var cell = _sheet.Cell(_row, NameColumn);
             cell.Value = text;
             cell.Style.Font.Italic = true;
             cell.Style.Font.FontSize = 9;
@@ -238,35 +303,43 @@ public static class ExcelExporter
 
         public void Finish()
         {
-            sheet.Column(CodeColumn).Width = 9;
-            sheet.Column(NameColumn).Width = 40;
-            for (var i = 0; i < months; i++)
-                sheet.Column(FirstMonthColumn + i).Width = 13.5;
-            if (withTotalColumn)
-                sheet.Column(TotalColumn).Width = 15;
+            _sheet.Column(CodeColumn).Width = 9;
+            _sheet.Column(NameColumn).Width = 40;
 
-            sheet.SheetView.FreezeRows(HeaderRow);
-            sheet.SheetView.FreezeColumns(NameColumn);
+            if (_leadingHeader is not null)
+                _sheet.Column(FirstValueColumn).Width = 15;
 
-            sheet.PageSetup.PageOrientation = XLPageOrientation.Landscape;
-            sheet.PageSetup.FitToPages(1, 0);
+            for (var i = 0; i < _months; i++)
+                _sheet.Column(_firstMonthColumn + i).Width = 13.5;
+
+            if (_trailingHeader is not null)
+                _sheet.Column(TrailingColumn).Width = 15;
+
+            _sheet.SheetView.FreezeRows(HeaderRow);
+            _sheet.SheetView.FreezeColumns(NameColumn);
+
+            _sheet.PageSetup.PageOrientation = XLPageOrientation.Landscape;
+            _sheet.PageSetup.FitToPages(1, 0);
         }
 
-        private void WriteValues(decimal[] values)
+        private void WriteValues(decimal[] values, decimal? leading, decimal? trailing)
         {
-            for (var i = 0; i < months; i++)
+            if (_leadingHeader is not null)
+                Money(FirstValueColumn, leading ?? 0m, bold: true);
+
+            for (var i = 0; i < _months; i++)
+                Money(_firstMonthColumn + i, values[i], bold: false);
+
+            if (_trailingHeader is not null)
+                Money(TrailingColumn, trailing ?? values.Sum(), bold: true);
+
+            void Money(int column, decimal value, bool bold)
             {
-                var cell = sheet.Cell(_row, FirstMonthColumn + i);
-                cell.Value = values[i];
+                var cell = _sheet.Cell(_row, column);
+                cell.Value = value;
                 cell.Style.NumberFormat.Format = MoneyFormat;
+                if (bold) cell.Style.Font.Bold = true;
             }
-
-            if (!withTotalColumn) return;
-
-            var total = sheet.Cell(_row, TotalColumn);
-            total.Value = values.Sum();
-            total.Style.NumberFormat.Format = MoneyFormat;
-            total.Style.Font.Bold = true;
         }
     }
 }

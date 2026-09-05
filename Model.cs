@@ -50,6 +50,18 @@ public static class AccountTypes
     public static readonly int[] ProfitAndLoss = [Sales, CostOfSales, OtherIncome, OtherExpenses];
 
     /// <summary>
+    /// Every type in the order a general ledger presents them: assets, liabilities,
+    /// capital, then the trading accounts.
+    /// </summary>
+    public static readonly int[] LedgerOrder =
+    [
+        CurrentAsset, NonCurrentAsset, IntangibleAsset,
+        CurrentLiability, NonCurrentLiability, IntangibleLiability,
+        MainCapital, OtherCapital, ProfitOrLoss,
+        Sales, CostOfSales, OtherIncome, OtherExpenses,
+    ];
+
+    /// <summary>
     /// Revenue nets credit-positive, expenditure nets debit-positive — mirrors the
     /// IIf chain in qryCreateCombinedTransactionsAll.
     /// </summary>

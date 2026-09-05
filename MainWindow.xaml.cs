@@ -3,7 +3,10 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
 using Microsoft.Win32;
 
 namespace KelsoftReportExport;
@@ -52,6 +55,8 @@ public partial class MainWindow : Window
         YearsList.ItemsSource = _years;
         YearSelection.SelectionChanged += UpdateExportState;
         Closed += (_, _) => YearSelection.SelectionChanged -= UpdateExportState;
+        StateChanged += (_, _) => UpdateMaximiseGlyph();
+        MaximiseBehaviour.Apply(this);
         UpdateExportState();
 
         // Allow a data file to be passed on the command line, or dropped on the .exe.
@@ -104,6 +109,7 @@ public partial class MainWindow : Window
         DataFileBox.Text = path;
         ClientLabel.Text = _clientName;
         ClientChipPanel.Visibility = Visibility.Visible;
+        RiseIn(ClientChipPanel);
 
         foreach (var year in years)
             _years.Add(new YearSelection(year, year.EntryCount > 0));
@@ -155,6 +161,8 @@ public partial class MainWindow : Window
 
     private bool WantBalanceSheet => BalanceSheetCheck.IsChecked == true;
 
+    private bool WantGeneralLedger => GeneralLedgerCheck.IsChecked == true;
+
     private void UpdateExportState()
     {
         if (ExportButton is null) return;
@@ -164,7 +172,7 @@ public partial class MainWindow : Window
         ExportButton.IsEnabled =
             DataFileBox.Text.Length > 0 &&
             selected > 0 &&
-            (WantProfitAndLoss || WantBalanceSheet);
+            (WantProfitAndLoss || WantBalanceSheet || WantGeneralLedger);
 
         YearSummary.Text = _years.Count == 0
             ? ""
@@ -191,6 +199,7 @@ public partial class MainWindow : Window
         var outputPath = OutputBox.Text.Trim();
         var wantProfitAndLoss = WantProfitAndLoss;
         var wantBalanceSheet = WantBalanceSheet;
+        var wantGeneralLedger = WantGeneralLedger;
 
         if (years.Count == 0) return;
 
@@ -233,14 +242,26 @@ public partial class MainWindow : Window
                             unbalanced.Add($"FY{year.Label} — worst at {month:MMMM yyyy}, out by {difference:N2}");
                     }
 
-                    exports.Add(new YearExport(year, profitAndLoss, balanceSheet));
+                    GeneralLedger? generalLedger = null;
+                    if (wantGeneralLedger)
+                    {
+                        generalLedger = GeneralLedgerBuilder.Build(file, year, clientName);
+
+                        // The ledger and the balance sheet fail together on the same data,
+                        // so only report it once.
+                        if (!wantBalanceSheet && !generalLedger.Balances(out var difference, out var month))
+                            unbalanced.Add($"FY{year.Label} — worst at {month:MMMM yyyy}, out by {difference:N2}");
+                    }
+
+                    exports.Add(new YearExport(year, profitAndLoss, balanceSheet, generalLedger));
                 }
 
                 Report("Writing workbook…");
                 ExcelExporter.Export(exports, outputPath);
             });
 
-            var sheets = years.Count * ((wantProfitAndLoss ? 1 : 0) + (wantBalanceSheet ? 1 : 0));
+            var sheets = years.Count * ((wantProfitAndLoss ? 1 : 0) + (wantBalanceSheet ? 1 : 0) +
+                                        (wantGeneralLedger ? 1 : 0));
             SetStatus($"Wrote {sheets} worksheet(s).");
             succeeded = true;
         }
@@ -278,7 +299,19 @@ public partial class MainWindow : Window
 
     private void SetBusy(bool busy)
     {
-        Progress.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
+        if (busy)
+        {
+            Progress.Opacity = 0;
+            Progress.Visibility = Visibility.Visible;
+            FadeTo(Progress, 1);
+        }
+        else
+        {
+            var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(180));
+            fade.Completed += (_, _) => Progress.Visibility = Visibility.Collapsed;
+            Progress.BeginAnimation(OpacityProperty, fade);
+        }
+
         Cursor = busy ? System.Windows.Input.Cursors.Wait : null;
 
         ExportButton.IsEnabled = !busy;
@@ -287,6 +320,81 @@ public partial class MainWindow : Window
         YearsList.IsEnabled = !busy;
 
         if (!busy) UpdateExportState();
+    }
+
+    // ------------------------------------------------------- animation
+
+    /// <summary>Fades an element in while it settles upward into place.</summary>
+    private static void RiseIn(FrameworkElement element, double fromY = 8, int milliseconds = 260)
+    {
+        var shift = new TranslateTransform(0, fromY);
+        element.RenderTransform = shift;
+
+        var duration = TimeSpan.FromMilliseconds(milliseconds);
+
+        element.BeginAnimation(OpacityProperty,
+            new DoubleAnimation(0, 1, duration));
+
+        shift.BeginAnimation(TranslateTransform.YProperty,
+            new DoubleAnimation(fromY, 0, duration)
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+            });
+    }
+
+    private static void FadeTo(UIElement element, double opacity, int milliseconds = 180) =>
+        element.BeginAnimation(OpacityProperty,
+            new DoubleAnimation(opacity, TimeSpan.FromMilliseconds(milliseconds)));
+
+    // ---------------------------------------------------- window chrome
+
+    // Segoe Fluent Icons chrome glyphs: U+E922 maximise, U+E923 restore. Named because
+    // a bare private-use character mid-expression says nothing to a reader.
+    private const string MaximiseGlyph = "";
+    private const string RestoreGlyph = "";
+
+    private void Header_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (e.ClickCount == 2)
+        {
+            ToggleMaximise();
+            return;
+        }
+
+        if (e.ButtonState != System.Windows.Input.MouseButtonState.Pressed) return;
+
+        try
+        {
+            DragMove();
+        }
+        catch (InvalidOperationException)
+        {
+            // The button was released before the drag started; nothing to do.
+        }
+    }
+
+    private void Minimise_Click(object sender, RoutedEventArgs e) =>
+        WindowState = WindowState.Minimized;
+
+    private void Maximise_Click(object sender, RoutedEventArgs e) => ToggleMaximise();
+
+    private void Close_Click(object sender, RoutedEventArgs e) => Close();
+
+    private void ToggleMaximise() =>
+        WindowState = WindowState == WindowState.Maximized
+            ? WindowState.Normal
+            : WindowState.Maximized;
+
+    private void UpdateMaximiseGlyph()
+    {
+        var maximised = WindowState == WindowState.Maximized;
+        var label = maximised ? "Restore" : "Maximise";
+
+        MaximiseButton.Content = maximised ? RestoreGlyph : MaximiseGlyph;
+        MaximiseButton.ToolTip = label;
+
+        // The glyph carries no meaning to a screen reader, so keep the name in step.
+        AutomationProperties.SetName(MaximiseButton, label);
     }
 
     private void ShowWarning(string message) =>
