@@ -2,7 +2,8 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Kelsoft Report Export"
-        Width="980" Height="910" MinWidth="820" MinHeight="740"
+        Width="980" Height="910"
+        MinWidth="560" MinHeight="400"
         WindowStartupLocation="CenterScreen"
         FontFamily="Segoe UI" FontSize="13"
         Background="{StaticResource Page}"
@@ -10,6 +11,11 @@
         UseLayoutRounding="True"
         WindowStyle="None" ResizeMode="CanResize"
         Icon="app.ico">
+
+    <!-- The size above is what the app would like. WindowSizing cuts it down to whatever the
+         monitor can actually show, and the minimum is deliberately far below the natural size
+         of the layout: past that point the body scrolls rather than the window being unable
+         to fit on the screen. -->
 
     <WindowChrome.WindowChrome>
         <!-- Caption height 0: the header handles dragging itself, so the whole navy
@@ -66,20 +72,17 @@
                             Click="Close_Click" />
                 </StackPanel>
 
-                <Grid Grid.Row="1" Margin="30,6,30,26">
+                <Grid Grid.Row="1" Style="{StaticResource HeaderBlock}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <Border Grid.Column="0" Width="46" Height="46" CornerRadius="11"
-                            Background="#26456C" Margin="0,2,18,0">
-                        <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE9D2;"
-                                   FontSize="22" Foreground="#8FB6E8"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Border Grid.Column="0" Style="{StaticResource AppLogo}">
+                        <TextBlock Text="&#xE9D2;" Style="{StaticResource AppLogoGlyph}" />
                     </Border>
 
-                    <StackPanel Grid.Column="1">
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
                         <TextBlock Text="Kelsoft Report Export" Style="{StaticResource AppTitle}" />
                         <TextBlock Style="{StaticResource AppSubtitle}"
                                    Text="Monthly Profit and Loss, Balance Sheet and General Ledger statements, straight from a Kelsoft client data file to Excel." />
@@ -89,210 +92,229 @@
         </Border>
 
         <!-- ============ body ============ -->
-        <Border Grid.Row="1" Background="{StaticResource Card}" CornerRadius="12"
-                BorderBrush="{StaticResource BorderSoft}" BorderThickness="1"
-                Margin="24,20,24,16" Padding="26,22">
-            <Border.Effect>
-                <DropShadowEffect Color="#101828" BlurRadius="18" ShadowDepth="2"
-                                  Direction="270" Opacity="0.07" />
-            </Border.Effect>
+        <Border Grid.Row="1" Style="{StaticResource BodyCard}">
+            <!-- The four steps fill the card while there is room, and scroll once there is
+                 not. Taking the card's height is what makes the first half work: measured
+                 against a real height rather than the infinity a scroll viewer would
+                 otherwise offer, the year list takes up whatever slack is going. The second
+                 half is the minimum, which MainWindow keeps at everything-but-the-list plus
+                 the list's own minimum — the exact height below which something has to give.
+                 A grid asked to be shorter than its minimum simply overflows the card, and
+                 that is what brings the scrollbar out. -->
+            <ScrollViewer x:Name="BodyScroll" Focusable="False"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <Grid x:Name="BodyGrid" Height="{Binding ViewportHeight, ElementName=BodyScroll}">
+                    <Grid.Style>
+                        <!-- Keeps the steps off the scrollbar on the sizes that grow one. -->
+                        <Style TargetType="Grid">
+                            <Style.Triggers>
+                                <DataTrigger Value="Visible"
+                                             Binding="{Binding ComputedVerticalScrollBarVisibility, ElementName=BodyScroll}">
+                                    <Setter Property="Margin" Value="0,0,8,0" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition x:Name="YearsRow" Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <!-- 1. data file -->
-                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-                    <Border Style="{StaticResource StepNumber}">
-                        <TextBlock Text="1" Style="{StaticResource StepNumberText}" />
-                    </Border>
-                    <TextBlock Text="Kelsoft data file" Style="{StaticResource StepLabel}" />
-                </StackPanel>
-
-                <Grid Grid.Row="1">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <Border Style="{StaticResource FieldShell}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Style="{StaticResource FieldIcon}" Text="&#xE8A5;" />
-                            <TextBox x:Name="DataFileBox" Grid.Column="1" IsReadOnly="True"
-                                     Style="{StaticResource PlainTextBox}" />
-                        </Grid>
-                    </Border>
-                    <Button x:Name="BrowseDataButton" Grid.Column="1" Content="Browse…"
-                            Style="{StaticResource SecondaryButton}" Margin="10,0,0,0"
-                            Click="BrowseData_Click" />
-                </Grid>
-
-                <Border x:Name="ClientChipPanel" Grid.Row="2" Style="{StaticResource ClientChip}"
-                        Margin="0,12,0,0" Visibility="Collapsed">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE77B;" FontSize="13"
-                                   Foreground="{StaticResource Success}" VerticalAlignment="Center"
-                                   Margin="0,0,8,0" />
-                        <TextBlock x:Name="ClientLabel" FontSize="12.5" FontWeight="SemiBold"
-                                   Foreground="{StaticResource Success}" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Border>
-
-                <!-- 2. reports -->
-                <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,26,0,10">
-                    <Border Style="{StaticResource StepNumber}">
-                        <TextBlock Text="2" Style="{StaticResource StepNumberText}" />
-                    </Border>
-                    <TextBlock Text="Reports to produce" Style="{StaticResource StepLabel}" />
-                </StackPanel>
-
-                <Grid Grid.Row="4">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
-                    <ToggleButton x:Name="ProfitAndLossCheck" Grid.Column="0" IsChecked="True"
-                                  AutomationProperties.Name="Profit and Loss"
-                                  Style="{StaticResource ReportCard}" Margin="0,0,6,0"
-                                  Checked="ReportChoice_Changed" Unchecked="ReportChoice_Changed">
-                        <StackPanel>
-                            <TextBlock Text="Profit and Loss" Style="{StaticResource ReportCardTitle}" />
-                            <TextBlock Style="{StaticResource ReportCardDetail}"
-                                       Text="Trading income through to net profit, with a year total." />
-                        </StackPanel>
-                    </ToggleButton>
-
-                    <ToggleButton x:Name="BalanceSheetCheck" Grid.Column="1" IsChecked="True"
-                                  AutomationProperties.Name="Balance Sheet"
-                                  Style="{StaticResource ReportCard}" Margin="6,0,6,0"
-                                  Checked="ReportChoice_Changed" Unchecked="ReportChoice_Changed">
-                        <StackPanel>
-                            <TextBlock Text="Balance Sheet" Style="{StaticResource ReportCardTitle}" />
-                            <TextBlock Style="{StaticResource ReportCardDetail}"
-                                       Text="Equity, assets and liabilities at each month end." />
-                        </StackPanel>
-                    </ToggleButton>
-
-                    <ToggleButton x:Name="GeneralLedgerCheck" Grid.Column="2" IsChecked="True"
-                                  AutomationProperties.Name="General Ledger"
-                                  Style="{StaticResource ReportCard}" Margin="6,0,0,0"
-                                  Checked="ReportChoice_Changed" Unchecked="ReportChoice_Changed">
-                        <StackPanel>
-                            <TextBlock Text="General Ledger" Style="{StaticResource ReportCardTitle}" />
-                            <TextBlock Style="{StaticResource ReportCardDetail}"
-                                       Text="Every account: opening balance, monthly movement, close." />
-                        </StackPanel>
-                    </ToggleButton>
-                </Grid>
-
-                <!-- 3. years -->
-                <Grid Grid.Row="5" Margin="0,26,0,10">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <!-- 1. data file -->
+                    <StackPanel Grid.Row="0" Orientation="Horizontal"
+                                Style="{StaticResource FirstStepHeading}">
                         <Border Style="{StaticResource StepNumber}">
-                            <TextBlock Text="3" Style="{StaticResource StepNumberText}" />
+                            <TextBlock Text="1" Style="{StaticResource StepNumberText}" />
                         </Border>
-                        <TextBlock Text="Financial years" Style="{StaticResource StepLabel}" />
-                        <TextBlock x:Name="YearSummary" Style="{StaticResource Hint}"
-                                   VerticalAlignment="Center" Margin="10,1,0,0" />
+                        <TextBlock Text="Kelsoft data file" Style="{StaticResource StepLabel}" />
                     </StackPanel>
-                    <Button Grid.Column="1" Content="Select all" Style="{StaticResource LinkButton}"
-                            Click="SelectAll_Click" />
-                    <Button Grid.Column="2" Content="Select none" Style="{StaticResource LinkButton}"
-                            Click="SelectNone_Click" />
-                </Grid>
 
-                <Border Grid.Row="6" BorderBrush="{StaticResource BorderSoft}" BorderThickness="1"
-                        CornerRadius="9" Padding="5" MinHeight="210" Background="White">
-                    <Grid>
-                        <ListBox x:Name="YearsList" BorderThickness="0" Background="Transparent"
-                                 ItemContainerStyle="{StaticResource YearRow}"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-
-                                        <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                                  VerticalAlignment="Center" />
-                                        <TextBlock Grid.Column="1" Text="{Binding Label}" FontWeight="SemiBold"
-                                                   Width="74" Margin="10,0,0,0" VerticalAlignment="Center" />
-                                        <TextBlock Grid.Column="2" Text="{Binding Period}"
-                                                   Foreground="{StaticResource TextMuted}" FontSize="12.5"
-                                                   VerticalAlignment="Center" />
-                                        <Border Grid.Column="3" Style="{StaticResource CountPill}">
-                                            <TextBlock Text="{Binding EntryText}"
-                                                       Style="{StaticResource CountPillText}" />
-                                        </Border>
-                                    </Grid>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-
-                        <TextBlock x:Name="EmptyYears" Style="{StaticResource Hint}"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   Text="Choose a data file to list its financial years." />
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource FieldShell}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource FieldIcon}" Text="&#xE8A5;" />
+                                <TextBox x:Name="DataFileBox" Grid.Column="1" IsReadOnly="True"
+                                         Style="{StaticResource PlainTextBox}" />
+                            </Grid>
+                        </Border>
+                        <Button x:Name="BrowseDataButton" Grid.Column="1" Content="Browse…"
+                                Style="{StaticResource SecondaryButton}" Margin="10,0,0,0"
+                                Click="BrowseData_Click" />
                     </Grid>
-                </Border>
 
-                <!-- 4. output -->
-                <StackPanel Grid.Row="7" Orientation="Horizontal" Margin="0,26,0,10">
-                    <Border Style="{StaticResource StepNumber}">
-                        <TextBlock Text="4" Style="{StaticResource StepNumberText}" />
+                    <Border x:Name="ClientChipPanel" Grid.Row="2" Style="{StaticResource ClientChip}"
+                            Margin="0,12,0,0" Visibility="Collapsed">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE77B;" FontSize="13"
+                                       Foreground="{StaticResource Success}" VerticalAlignment="Center"
+                                       Margin="0,0,8,0" />
+                            <TextBlock x:Name="ClientLabel" FontSize="12.5" FontWeight="SemiBold"
+                                       Foreground="{StaticResource Success}" VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
                     </Border>
-                    <TextBlock Text="Save Excel file to" Style="{StaticResource StepLabel}" />
-                </StackPanel>
 
-                <Grid Grid.Row="8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <Border Style="{StaticResource FieldShell}">
+                    <!-- 2. reports -->
+                    <StackPanel Grid.Row="3" Orientation="Horizontal"
+                                Style="{StaticResource StepHeading}">
+                        <Border Style="{StaticResource StepNumber}">
+                            <TextBlock Text="2" Style="{StaticResource StepNumberText}" />
+                        </Border>
+                        <TextBlock Text="Reports to produce" Style="{StaticResource StepLabel}" />
+                    </StackPanel>
+
+                    <Grid Grid.Row="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <ToggleButton x:Name="ProfitAndLossCheck" Grid.Column="0" IsChecked="True"
+                                      AutomationProperties.Name="Profit and Loss"
+                                      Style="{StaticResource ReportCard}" Margin="0,0,6,0"
+                                      Checked="ReportChoice_Changed" Unchecked="ReportChoice_Changed">
+                            <StackPanel>
+                                <TextBlock Text="Profit and Loss" Style="{StaticResource ReportCardTitle}" />
+                                <TextBlock Style="{StaticResource ReportCardDetail}"
+                                           Text="Trading income through to net profit, with a year total." />
+                            </StackPanel>
+                        </ToggleButton>
+
+                        <ToggleButton x:Name="BalanceSheetCheck" Grid.Column="1" IsChecked="True"
+                                      AutomationProperties.Name="Balance Sheet"
+                                      Style="{StaticResource ReportCard}" Margin="6,0,6,0"
+                                      Checked="ReportChoice_Changed" Unchecked="ReportChoice_Changed">
+                            <StackPanel>
+                                <TextBlock Text="Balance Sheet" Style="{StaticResource ReportCardTitle}" />
+                                <TextBlock Style="{StaticResource ReportCardDetail}"
+                                           Text="Equity, assets and liabilities at each month end." />
+                            </StackPanel>
+                        </ToggleButton>
+
+                        <ToggleButton x:Name="GeneralLedgerCheck" Grid.Column="2" IsChecked="True"
+                                      AutomationProperties.Name="General Ledger"
+                                      Style="{StaticResource ReportCard}" Margin="6,0,0,0"
+                                      Checked="ReportChoice_Changed" Unchecked="ReportChoice_Changed">
+                            <StackPanel>
+                                <TextBlock Text="General Ledger" Style="{StaticResource ReportCardTitle}" />
+                                <TextBlock Style="{StaticResource ReportCardDetail}"
+                                           Text="Every account: opening balance, monthly movement, close." />
+                            </StackPanel>
+                        </ToggleButton>
+                    </Grid>
+
+                    <!-- 3. years -->
+                    <Grid Grid.Row="5" Style="{StaticResource StepHeading}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Orientation="Horizontal">
+                            <Border Style="{StaticResource StepNumber}">
+                                <TextBlock Text="3" Style="{StaticResource StepNumberText}" />
+                            </Border>
+                            <TextBlock Text="Financial years" Style="{StaticResource StepLabel}" />
+                            <TextBlock x:Name="YearSummary" Style="{StaticResource Hint}"
+                                       VerticalAlignment="Center" Margin="10,1,0,0" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="Select all" Style="{StaticResource LinkButton}"
+                                Click="SelectAll_Click" />
+                        <Button Grid.Column="2" Content="Select none" Style="{StaticResource LinkButton}"
+                                Click="SelectNone_Click" />
+                    </Grid>
+
+                    <Border x:Name="YearsShell" Grid.Row="6" Style="{StaticResource YearsShell}">
                         <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Style="{StaticResource FieldIcon}" Text="&#xE9F9;" />
-                            <TextBox x:Name="OutputBox" Grid.Column="1"
-                                     Style="{StaticResource PlainTextBox}" />
+                            <ListBox x:Name="YearsList" BorderThickness="0" Background="Transparent"
+                                     ItemContainerStyle="{StaticResource YearRow}"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                      VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Label}" FontWeight="SemiBold"
+                                                       Width="74" Margin="10,0,0,0" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Text="{Binding Period}"
+                                                       Foreground="{StaticResource TextMuted}" FontSize="12.5"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       VerticalAlignment="Center" />
+                                            <Border Grid.Column="3" Style="{StaticResource CountPill}">
+                                                <TextBlock Text="{Binding EntryText}"
+                                                           Style="{StaticResource CountPillText}" />
+                                            </Border>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <TextBlock x:Name="EmptyYears" Style="{StaticResource Hint}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       TextWrapping="Wrap" TextAlignment="Center" Margin="16,0"
+                                       Text="Choose a data file to list its financial years." />
                         </Grid>
                     </Border>
-                    <Button x:Name="BrowseOutputButton" Grid.Column="1" Content="Browse…"
-                            Style="{StaticResource SecondaryButton}" Margin="10,0,0,0"
-                            Click="BrowseOutput_Click" />
+
+                    <!-- 4. output -->
+                    <StackPanel Grid.Row="7" Orientation="Horizontal"
+                                Style="{StaticResource StepHeading}">
+                        <Border Style="{StaticResource StepNumber}">
+                            <TextBlock Text="4" Style="{StaticResource StepNumberText}" />
+                        </Border>
+                        <TextBlock Text="Save Excel file to" Style="{StaticResource StepLabel}" />
+                    </StackPanel>
+
+                    <Grid Grid.Row="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource FieldShell}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource FieldIcon}" Text="&#xE9F9;" />
+                                <TextBox x:Name="OutputBox" Grid.Column="1"
+                                         Style="{StaticResource PlainTextBox}" />
+                            </Grid>
+                        </Border>
+                        <Button x:Name="BrowseOutputButton" Grid.Column="1" Content="Browse…"
+                                Style="{StaticResource SecondaryButton}" Margin="10,0,0,0"
+                                Click="BrowseOutput_Click" />
+                    </Grid>
                 </Grid>
-            </Grid>
+            </ScrollViewer>
         </Border>
 
         <!-- ============ action bar ============ -->
-        <Border Grid.Row="2" Background="{StaticResource Card}"
-                BorderBrush="{StaticResource BorderSoft}" BorderThickness="0,1,0,0"
-                Padding="30,16">
+        <Border Grid.Row="2" Style="{StaticResource ActionBar}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -303,7 +325,7 @@
                 <CheckBox x:Name="OpenWhenDone" Grid.Column="0" Content="Open when finished"
                           IsChecked="True" VerticalAlignment="Center" />
 
-                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="24,0,24,0">
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="18,0,18,0">
                     <TextBlock x:Name="StatusLabel" Style="{StaticResource Hint}"
                                TextTrimming="CharacterEllipsis" />
                     <ProgressBar x:Name="Progress" Style="{StaticResource SlimProgress}"

@@ -29,19 +29,152 @@
 
     <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
+    <!-- ===================== compact layout ===================== -->
+
+    <!--
+      Every measurement that has to give way on a small or heavily scaled display is gathered
+      here: the setter carries the roomy value, the trigger the tight one. The window raises
+      IsCompact once it is too small for the roomy spacing — chiefly a display-scaling matter,
+      since at 150% a 1080p desktop is only about 690 units tall. Keeping the two values side
+      by side means the difference between the layouts reads in one place rather than having
+      to be hunted through the window.
+    -->
+
+    <Style x:Key="HeaderBlock" TargetType="Grid">
+        <Setter Property="Margin" Value="30,6,30,26" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsCompact, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                <Setter Property="Margin" Value="20,2,20,14" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="AppLogo" TargetType="Border">
+        <Setter Property="Width" Value="46" />
+        <Setter Property="Height" Value="46" />
+        <Setter Property="CornerRadius" Value="11" />
+        <Setter Property="Background" Value="#26456C" />
+        <Setter Property="Margin" Value="0,2,18,0" />
+        <Setter Property="VerticalAlignment" Value="Top" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsCompact, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                <Setter Property="Width" Value="34" />
+                <Setter Property="Height" Value="34" />
+                <Setter Property="CornerRadius" Value="9" />
+                <Setter Property="Margin" Value="0,0,13,0" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="AppLogoGlyph" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource IconFont}" />
+        <Setter Property="FontSize" Value="22" />
+        <Setter Property="Foreground" Value="#8FB6E8" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsCompact, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                <Setter Property="FontSize" Value="17" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="BodyCard" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource Card}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Margin" Value="24,20,24,16" />
+        <Setter Property="Padding" Value="26,22" />
+        <Setter Property="Effect">
+            <Setter.Value>
+                <DropShadowEffect Color="#101828" BlurRadius="18" ShadowDepth="2"
+                                  Direction="270" Opacity="0.07" />
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsCompact, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                <Setter Property="Margin" Value="12,10,12,8" />
+                <Setter Property="Padding" Value="16,14" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!--
+      A step heading is a StackPanel, or a Grid where the step carries buttons beside it, so
+      these target the base type the two share: a keyed style may be applied to any element
+      its target type is assignable from.
+    -->
+    <Style x:Key="FirstStepHeading" TargetType="FrameworkElement">
+        <Setter Property="Margin" Value="0,0,0,10" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsCompact, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                <Setter Property="Margin" Value="0,0,0,7" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="StepHeading" TargetType="FrameworkElement">
+        <Setter Property="Margin" Value="0,26,0,10" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsCompact, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                <Setter Property="Margin" Value="0,15,0,7" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- The part of the body that gives up height first, because it scrolls internally. -->
+    <Style x:Key="YearsShell" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource Card}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="9" />
+        <Setter Property="Padding" Value="5" />
+        <Setter Property="MinHeight" Value="210" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsCompact, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                <Setter Property="MinHeight" Value="112" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="ActionBar" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource Card}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
+        <Setter Property="BorderThickness" Value="0,1,0,0" />
+        <Setter Property="Padding" Value="30,16" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsCompact, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                <Setter Property="Padding" Value="18,10" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- ===================== text ===================== -->
 
     <Style x:Key="AppTitle" TargetType="TextBlock">
         <Setter Property="FontSize" Value="21" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Foreground" Value="White" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsCompact, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                <Setter Property="FontSize" Value="17" />
+            </DataTrigger>
+        </Style.Triggers>
     </Style>
 
+    <!-- Explanatory rather than load-bearing, so it is the first thing dropped when short. -->
     <Style x:Key="AppSubtitle" TargetType="TextBlock">
         <Setter Property="FontSize" Value="12.5" />
         <Setter Property="Foreground" Value="#A9BEDC" />
         <Setter Property="TextWrapping" Value="Wrap" />
         <Setter Property="Margin" Value="0,5,0,0" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsCompact, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                <Setter Property="Visibility" Value="Collapsed" />
+            </DataTrigger>
+        </Style.Triggers>
     </Style>
 
     <Style x:Key="StepLabel" TargetType="TextBlock">
@@ -332,6 +465,9 @@
                                 </BeginStoryboard>
                             </MultiTrigger.ExitActions>
                         </MultiTrigger>
+                        <DataTrigger Binding="{Binding IsCompact, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                            <Setter TargetName="Card" Property="Padding" Value="11,9" />
+                        </DataTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
@@ -349,6 +485,11 @@
         <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
         <Setter Property="TextWrapping" Value="Wrap" />
         <Setter Property="Margin" Value="0,4,0,0" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsCompact, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                <Setter Property="Visibility" Value="Collapsed" />
+            </DataTrigger>
+        </Style.Triggers>
     </Style>
 
     <!-- ===================== buttons ===================== -->
@@ -400,6 +541,9 @@
             <Trigger Property="IsEnabled" Value="False">
                 <Setter Property="Effect" Value="{x:Null}" />
             </Trigger>
+            <DataTrigger Binding="{Binding IsCompact, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                <Setter Property="Padding" Value="20,9" />
+            </DataTrigger>
         </Style.Triggers>
     </Style>
 
@@ -459,6 +603,12 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsCompact, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                <Setter Property="Width" Value="40" />
+                <Setter Property="Height" Value="29" />
+            </DataTrigger>
+        </Style.Triggers>
     </Style>
 
     <Style x:Key="CloseCaptionButton" TargetType="Button" BasedOn="{StaticResource CaptionButton}">

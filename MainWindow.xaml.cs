@@ -46,6 +46,14 @@ public sealed class YearSelection(FinancialYear year, bool isSelected) : INotify
 
 public partial class MainWindow : Window
 {
+    // Below either of these the roomy spacing no longer fits, so the layout tightens:
+    // the header loses its strapline, the report cards lose their descriptions, and every
+    // gap closes up. Both sit just above the natural size of the roomy layout, so the
+    // switch happens before anything would have to scroll. It is display scaling that
+    // makes this necessary — at 150% a 1080p desktop is only about 690 units tall.
+    private const double CompactBelowWidth = 880;
+    private const double CompactBelowHeight = 860;
+
     private readonly ObservableCollection<YearSelection> _years = [];
     private string _clientName = "";
 
@@ -56,13 +64,52 @@ public partial class MainWindow : Window
         YearSelection.SelectionChanged += UpdateExportState;
         Closed += (_, _) => YearSelection.SelectionChanged -= UpdateExportState;
         StateChanged += (_, _) => UpdateMaximiseGlyph();
-        MaximiseBehaviour.Apply(this);
+
+        // Seeded from the requested size so the first frame is already right, then kept in
+        // step as the window is resized — including the shrink WindowSizing may apply
+        // before the window is ever shown.
+        IsCompact = Width < CompactBelowWidth || Height < CompactBelowHeight;
+        SizeChanged += (_, _) =>
+            IsCompact = ActualWidth < CompactBelowWidth || ActualHeight < CompactBelowHeight;
+
+        BodyGrid.LayoutUpdated += (_, _) => UpdateBodyMinimum();
+
+        WindowSizing.Apply(this);
         UpdateExportState();
 
         // Allow a data file to be passed on the command line, or dropped on the .exe.
         var startupFile = Environment.GetCommandLineArgs().Skip(1).FirstOrDefault();
         if (startupFile is not null && System.IO.File.Exists(startupFile))
             Loaded += (_, _) => LoadDataFile(startupFile);
+    }
+
+    /// <summary>True while the window is too small for the roomy spacing; the styles read it.</summary>
+    public bool IsCompact
+    {
+        get => (bool)GetValue(IsCompactProperty);
+        private set => SetValue(IsCompactProperty, value);
+    }
+
+    public static readonly DependencyProperty IsCompactProperty =
+        DependencyProperty.Register(nameof(IsCompact), typeof(bool), typeof(MainWindow),
+            new PropertyMetadata(false));
+
+    /// <summary>
+    /// Holds the body to the shortest height that shows every step: the four steps as they
+    /// currently stand, plus the year list's own minimum. Below that the grid overflows the
+    /// card and the scrollbar takes over. Measuring the steps rather than naming a number
+    /// keeps this true as they change size — the client chip appearing, the compact spacing
+    /// coming in, a strapline wrapping to a second line.
+    /// </summary>
+    private void UpdateBodyMinimum()
+    {
+        // Row heights, not the grid's, because a grid squeezed below its content still
+        // reports the height it was given rather than the height it needs.
+        var steps = BodyGrid.RowDefinitions.Sum(row => row.ActualHeight) - YearsRow.ActualHeight;
+        var minimum = steps + YearsShell.MinHeight;
+
+        if (Math.Abs(minimum - BodyGrid.MinHeight) > 0.5)
+            BodyGrid.MinHeight = minimum;
     }
 
     private void BrowseData_Click(object sender, RoutedEventArgs e)

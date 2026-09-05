@@ -85,8 +85,10 @@ jobs:
             'failing silently. Nothing to install: the .NET runtime is inside the executable.'
             ''
             'Windows SmartScreen warns on first run because the executable is not code'
-            'signed — **More info**, then **Run anyway**. `SHA256SUMS.txt` lists the hashes'
-            'if you want to check what you downloaded.'
+            'signed — **More info**, then **Run anyway**. To skip it, clear the download'
+            'mark before running: right-click the file, Properties, tick **Unblock** (or'
+            '``Unblock-File .\KelsoftReportExport-*.exe``). `SHA256SUMS.txt` lists the'
+            'hashes if you want to check what you downloaded.'
           )
           Set-Content notes.md ($notes -join "`n") -Encoding utf8
 

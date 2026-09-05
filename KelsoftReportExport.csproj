@@ -12,6 +12,8 @@
     <AssemblyName>KelsoftReportExport</AssemblyName>
     <RootNamespace>KelsoftReportExport</RootNamespace>
     <ApplicationIcon>app.ico</ApplicationIcon>
+    <!-- Declares per-monitor v2 DPI awareness rather than relying on the runtime default. -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <ItemGroup>

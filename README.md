@@ -17,10 +17,31 @@ statements with a column per month.
 
 The [latest release](https://github.com/anthony-keller/kelsoft-report-export/releases/latest)
 carries both builds: take `win-x64`, or `win-x86` if Office on that machine is 32-bit (see
-below). Nothing to install. SmartScreen warns on first run because it is unsigned —
-**More info**, then **Run anyway**.
+below). Nothing to install.
 
 Cut a release by pushing a tag: `git tag v1.0.0 && git push origin v1.0.0`.
+
+### The SmartScreen warning
+
+The executable is not code signed, so the first run brings up **"Windows protected your PC"**
+— *More info*, then *Run anyway*. Three ways past it, cheapest first:
+
+- **Clear the download mark.** The warning is triggered by the *mark of the web*, an alternate
+  data stream Windows attaches to anything downloaded, not by the file itself. Right-click the
+  `.exe` → Properties → tick **Unblock**, or run `Unblock-File .\KelsoftReportExport.exe`, and
+  it never appears again on that machine. A file copied from a USB stick or a network share is
+  never marked in the first place. This is the answer for a machine you have in front of you.
+- **Sign it.** A signature is the only thing that clears the warning for everybody. The cheap
+  route is [Azure Trusted Signing](https://learn.microsoft.com/azure/trusted-signing/) — about
+  US$10 a month, with identity validation available to individuals as well as organisations —
+  which adds one step to `release.yml` between the publish and the upload. An OV certificate
+  costs several times that, now requires a hardware token or a cloud HSM, and still starts with
+  no SmartScreen reputation; an EV certificate is trusted from the first download but is dearer
+  again. A self-signed certificate does nothing here: SmartScreen is reputation, not trust.
+- **An installer does not help.** An unsigned installer draws exactly the same warning, and
+  adds a UAC prompt if it writes anywhere but the user profile. What an installer buys is a
+  Start menu entry, an uninstall entry, a file association and an update path — worth having
+  once the app is on more than a couple of machines, but nothing to do with SmartScreen.
 
 ## Running it
 
@@ -67,8 +88,9 @@ question is which bitness. If in doubt, try the 64-bit build first.
 Nothing silently misbehaves when the provider is absent: `KelsoftDataFile` tries ACE 16, then
 ACE 12, then reports which bitness is missing and which build is running.
 
-WPF was chosen over WinForms deliberately: it lays out in device-independent units, so the
-window is correct on high-DPI displays without any per-control scaling work.
+WPF was chosen over WinForms deliberately: it lays out in device-independent units, so text
+and controls come out the right size on a high-DPI display without any per-control scaling
+work. What that does not do by itself is keep the window inside the screen — see below.
 
 ## Where the figures come from
 
@@ -184,9 +206,28 @@ In the sample file, 83 of 84 months balance at exactly 0.00. August 2024 is out 
 The standard title bar is replaced by `WindowChrome`, with the navy header acting as the
 caption — draggable, double-click to maximise, and its own minimise/maximise/close buttons.
 
-`MaximiseBehaviour` answers `WM_GETMINMAXINFO` with the work area of whichever monitor the
-window is on. Without it a frameless window maximises to the full monitor and covers the
-taskbar.
+`WindowSizing` keeps the window inside the work area of whichever monitor it is on, which
+covers two separate problems:
+
+- **Maximise.** It answers `WM_GETMINMAXINFO` with the work area, because a frameless window
+  otherwise maximises to the full monitor and covers the taskbar. The window's own minimum
+  goes back in the same reply — handling the message at all takes that out of WPF's hands —
+  held to the work area, so the minimum can never be why a window will not fit.
+- **Display scaling.** The layout asks for 980 × 910 units, which is more than a scaled display
+  has room for: at 150% on a 1080p screen the desktop is only about 1280 × 690 units, so the
+  window would open with the Export button below the bottom of the screen. On startup, and
+  again on a DPI or resolution change, the window is cut down to the work area and re-centred.
+  It works in physical pixels throughout, the one measure that holds whatever the scaling is.
+
+Making the window fit is half of it; the layout then has to be worth looking at. Below 880
+units wide or 860 tall it switches to compact metrics — `MainWindow.IsCompact`, which every
+measurement that gives way reads through a trigger, collected in one block at the top of
+`Theme.xaml`. The header loses its strapline and shrinks its badge, the report cards lose
+their descriptions, the year list halves its minimum height, and the gaps between steps close
+up: about 200 units in all, which is what makes 150% on a 1080p screen comfortable rather than
+merely possible. Past that the body scrolls, with the header and the action bar staying put,
+so Export is always on screen — the whole point of the exercise. `app.manifest` declares
+per-monitor v2 DPI awareness rather than leaving it to the runtime default.
 
 Interactions are animated: the window rises as it opens, year rows settle into place as a
 file is read, checkboxes and report cards cross-fade with a small tick pop. Every element
@@ -205,8 +246,9 @@ UI is both narratable and drivable from UI Automation — which is how it is tes
 | `BalanceSheetBuilder.cs` | Movements + opening balances → Balance Sheet |
 | `GeneralLedgerBuilder.cs` | Movements + opening balances → General Ledger |
 | `ExcelExporter.cs` | Worksheet writing (ClosedXML) |
-| `MaximiseBehaviour.cs` | Frameless maximise confined to the monitor work area |
-| `Theme.xaml` | Palette, control templates, animations |
+| `WindowSizing.cs` | Window held to the monitor work area: maximise, startup size, DPI changes |
+| `Theme.xaml` | Palette, control templates, animations, the compact metrics |
+| `app.manifest` | Per-monitor v2 DPI awareness |
 | `App.xaml`, `MainWindow.xaml(.cs)` | The window |
 | `.github/workflows/release.yml` | Tag → both executables, attached to a release |
 
